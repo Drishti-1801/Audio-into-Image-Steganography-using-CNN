@@ -109,8 +109,8 @@ container_img, revealed_audio = full_model.predict([test_img, test_audio])
 mse_image = np.mean((test_img - container_img)**2)
 corr_audio = np.corrcoef(test_audio.flatten(), revealed_audio.flatten())[0,1]
 
-print(f"\n🔹 MSE (Image): {mse_image:.6f}")
-print(f"🔹 Correlation (Audio): {corr_audio:.4f}")
+print(f"\n MSE (Image): {mse_image:.6f}")
+print(f" Correlation (Audio): {corr_audio:.4f}")
 
 
 # 8️ Visualization
