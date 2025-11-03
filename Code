@@ -1,6 +1,5 @@
-# ==========================================================
-# 🔒 Deep CNN-based Audio-into-Image Steganography (Tiny Version)
-# ==========================================================
+
+# Deep CNN-based Audio-into-Image Steganography (Tiny Version)
 
 import numpy as np
 import tensorflow as tf
