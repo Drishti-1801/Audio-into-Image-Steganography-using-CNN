@@ -1,0 +1,133 @@
+# ==========================================================
+# 🔒 Deep CNN-based Audio-into-Image Steganography (Tiny Version)
+# ==========================================================
+
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import layers, models
+from sklearn.preprocessing import MinMaxScaler
+import matplotlib.pyplot as plt
+from scipy.signal import correlate
+
+
+#  Load and Preprocess Image Dataset (CIFAR-10)
+
+from tensorflow.keras.datasets import cifar10
+
+(x_train, _), (_, _) = cifar10.load_data()
+x_train = x_train[:100].astype("float32") / 255.0        # only 100 images
+x_train = tf.image.resize(x_train, [24, 24]).numpy()     # resize to 24×24
+print(" Images:", x_train.shape)
+
+
+# 2️ Generate Synthetic Audio Data (Sine Waves)
+
+def generate_audio_samples(num=100, length=576):
+    audios = []
+    for i in range(num):
+        freq = np.random.randint(200, 1000)
+        t = np.linspace(0, 0.03, length)
+        audio = np.sin(2 * np.pi * freq * t)
+        audios.append(audio)
+    return np.array(audios)
+
+audios = generate_audio_samples()
+scaler = MinMaxScaler()
+audios = scaler.fit_transform(audios)
+audios = audios.reshape(100, 24, 24, 1)
+audios = np.repeat(audios, 3, axis=-1)                   # make 3-channel
+print(" Audios:", audios.shape)
+
+
+# 3️ Define Base CNN Block (as custom Layer)
+
+class BaseBlock(layers.Layer):
+    def __init__(self):
+        super(BaseBlock, self).__init__()
+        self.conv3a = layers.Conv2D(32, (3,3), activation='relu', padding='same')
+        self.conv3b = layers.Conv2D(32, (3,3), activation='relu', padding='same')
+        self.conv4a = layers.Conv2D(32, (4,4), activation='relu', padding='same')
+        self.conv4b = layers.Conv2D(32, (4,4), activation='relu', padding='same')
+        self.conv5a = layers.Conv2D(32, (5,5), activation='relu', padding='same')
+        self.conv5b = layers.Conv2D(32, (5,5), activation='relu', padding='same')
+        self.final  = layers.Conv2D(3, (3,3), activation='relu', padding='same')
+
+    def call(self, x):
+        c3 = self.conv3b(self.conv3a(x))
+        c4 = self.conv4b(self.conv4a(x))
+        c5 = self.conv5b(self.conv5a(x))
+        concat = layers.concatenate([c3, c4, c5])
+        return self.final(concat)
+
+
+# 4️ Build Prepare, Hiding, and Reveal Networks
+
+# Prepare network (audio feature extractor)
+audio_in = layers.Input(shape=(24,24,3))
+audio_feat = BaseBlock()(audio_in)
+prepare_net = models.Model(audio_in, audio_feat, name="PrepareNet")
+
+# Hiding network (embed audio into image)
+image_in = layers.Input(shape=(24,24,3))
+combined = layers.concatenate([image_in, audio_feat])
+hidden_out = BaseBlock()(combined)
+hiding_net = models.Model([image_in, audio_in], hidden_out, name="HidingNet")
+
+# Reveal network (recover audio from container)
+hidden_in = layers.Input(shape=(24,24,3))
+revealed_audio = BaseBlock()(hidden_in)
+reveal_net = models.Model(hidden_in, revealed_audio, name="RevealNet")
+
+
+# 5️ Combine Full Model (end-to-end)
+
+container = hiding_net([image_in, audio_in])
+revealed  = reveal_net(container)
+full_model = models.Model([image_in, audio_in], [container, revealed])
+
+full_model.compile(optimizer='adam',
+                   loss=['mse', 'mse'],
+                   loss_weights=[1.0, 1.0])
+
+full_model.summary()
+
+
+# 6️ Train Model (Tiny Demo)
+
+history = full_model.fit([x_train, audios],
+                         [x_train, audios],
+                         epochs=5, batch_size=10, verbose=1)
+
+
+# 7️ Evaluate on One Example
+
+idx = np.random.randint(0, 100)
+test_img   = x_train[idx:idx+1]
+test_audio = audios[idx:idx+1]
+
+container_img, revealed_audio = full_model.predict([test_img, test_audio])
+
+mse_image = np.mean((test_img - container_img)**2)
+corr_audio = np.corrcoef(test_audio.flatten(), revealed_audio.flatten())[0,1]
+
+print(f"\n🔹 MSE (Image): {mse_image:.6f}")
+print(f"🔹 Correlation (Audio): {corr_audio:.4f}")
+
+
+# 8️ Visualization
+
+plt.figure(figsize=(8,3))
+plt.subplot(1,3,1); plt.title("Original Image")
+plt.imshow(test_img[0]); plt.axis("off")
+plt.subplot(1,3,2); plt.title("Container Image")
+plt.imshow(container_img[0]); plt.axis("off")
+plt.subplot(1,3,3); plt.title("Difference")
+plt.imshow(np.abs(test_img[0]-container_img[0]))
+plt.axis("off")
+plt.show()
+
+plt.figure(figsize=(8,2))
+plt.plot(test_audio.flatten(), label="Original Audio")
+plt.plot(revealed_audio.flatten(), label="Revealed Audio", alpha=0.7)
+plt.legend(); plt.title("Audio Comparison")
+plt.show()
