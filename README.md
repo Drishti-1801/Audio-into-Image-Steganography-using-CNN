@@ -53,7 +53,7 @@ Each subnetwork uses multi-scale CNN layers (3×3, 4×4, 5×5 filters) to learn 
 
 | Original | Container | Difference |
 |-----------|------------|-------------|
-| ![Original](C:\Users\Rohit Vashist\Downloads\p1.png) | ![Container](C:\Users\Rohit Vashist\Downloads\p1.png) | ![Diff](C:\Users\Rohit Vashist\Downloads\p1.png) |
+| ![Original](p1.png) | ![Container](p1.png) | ![Diff](p1.png) |
 
 ### 🎵 Audio Waveform Comparison
 ![Audio Comparison](C:\Users\Rohit Vashist\Downloads\p2.png)
